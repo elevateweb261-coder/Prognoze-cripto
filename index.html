@@ -173,8 +173,15 @@ function updateSummary() {
 function submit() {
   if (!ready()) return;
   const data = JSON.stringify({ a: state.asset, d: state.dir, s: state.stake, t: state.dur });
-  if (tg && tg.sendData && tg.initData) { tg.sendData(data); }
-  else { alert("Deschide aplicația din botul de Telegram ca să plasezi prognoza.\n" + data); }
+  // in Telegram platform e "ios", "android", "tdesktop" etc.; intr-un browser obisnuit e "unknown"
+  const inTelegram = tg && tg.platform && tg.platform !== "unknown";
+  try {
+    if (!inTelegram) throw new Error("browser");
+    tg.sendData(data);
+  } catch (e) {
+    const msg = "Deschide aplicația din butonul 📱 Aplicația din meniul botului ca să plasezi prognoza.";
+    tg && tg.showAlert && inTelegram ? tg.showAlert(msg) : alert(msg);
+  }
 }
 if (tg && tg.MainButton) tg.MainButton.onClick(submit);
 document.getElementById("send").onclick = submit;

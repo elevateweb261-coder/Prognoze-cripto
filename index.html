@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Prognoze Crypto</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root {
+    --bg: #0d1121; --card: #161b33; --card2: #1d2340; --line: #262d4f;
+    --text: #eef0fa; --muted: #8c96b4; --green: #22c55e; --red: #f43f5e; --gold: #facc15; --violet: #8b5cf6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 14px 16px 90px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .between { justify-content: space-between; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 12px; }
+  .hero { background: linear-gradient(135deg, #2e1065, #164e63); border: none; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--violet); display: grid; place-items: center; font-weight: 700; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .big { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .stat { background: rgba(255,255,255,.08); border-radius: 12px; padding: 8px; text-align: center; }
+  .stat b { display: block; font-size: 16px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; border: 1px solid var(--line); background: var(--card2); color: var(--text); border-radius: 999px;
+          padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  .chip.on { background: var(--violet); border-color: var(--violet); }
+  .chip:disabled { opacity: .35; }
+  .price { font-size: 26px; font-weight: 800; }
+  .up { color: var(--green); } .down { color: var(--red); }
+  #chart { height: 260px; margin: 10px -6px 0; }
+  .dir { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dir button { border: 2px solid transparent; border-radius: 14px; padding: 14px; font: inherit; font-size: 17px; font-weight: 800; color: #fff; cursor: pointer; }
+  .dir .bu { background: rgba(34,197,94,.18); color: var(--green); }
+  .dir .bd { background: rgba(244,63,94,.18); color: var(--red); }
+  .dir .bu.on { background: var(--green); color: #052e16; }
+  .dir .bd.on { background: var(--red); color: #4c0519; }
+  h3 { margin: 14px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .summary { margin-top: 14px; padding: 12px; border-radius: 12px; background: var(--card2); text-align: center; }
+  .summary b { color: var(--gold); }
+  #send { display: none; width: 100%; margin-top: 12px; padding: 15px; border: 0; border-radius: 14px; background: var(--violet); color: #fff; font: inherit; font-weight: 800; font-size: 16px; }
+  .crowd { height: 8px; border-radius: 999px; background: var(--red); overflow: hidden; margin-top: 6px; }
+  .crowd i { display: block; height: 100%; background: var(--green); }
+  .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card hero">
+    <div class="row between">
+      <div class="row">
+        <div class="avatar" id="avatar">?</div>
+        <div><div id="name"><b>Jucător</b></div><div class="muted" id="level"></div></div>
+      </div>
+      <div style="text-align:right"><div class="muted">Sold</div><div class="big" id="bal">0</div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="wins">0</b><span class="muted">câștiguri</span></div>
+      <div class="stat"><b id="rate">-</b><span class="muted">rată</span></div>
+      <div class="stat"><b id="streak">0</b><span class="muted">🔥 serie</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chips" id="assets"></div>
+    <div class="row between" style="margin-top:12px">
+      <div>
+        <div class="muted"><span class="live"></span><span id="assetName"></span></div>
+        <div class="price" id="price">…</div>
+      </div>
+      <div style="text-align:right"><div class="muted">24h</div><div id="change" style="font-weight:700">…</div></div>
+    </div>
+    <div class="chips" id="intervals" style="margin-top:10px"></div>
+    <div id="chart"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Prognoza ta</h3>
+    <div class="dir">
+      <button class="bu" id="btnUp">⬆️ Urcă</button>
+      <button class="bd" id="btnDown">⬇️ Scade</button>
+    </div>
+    <h3>Miza</h3>
+    <div class="chips" id="stakes"></div>
+    <h3>Durata</h3>
+    <div class="chips" id="durations"></div>
+    <div class="summary" id="summary">Alege direcția</div>
+    <button id="send">Plasează prognoza</button>
+    <p class="muted" style="text-align:center;margin:10px 0 0">Soldul se actualizează după fiecare rezultat. Monedele sunt virtuale.</p>
+  </div>
+</div>
+
+<script>
+const ASSETS = {
+  BTC: ["BTCUSDT", "Bitcoin"], ETH: ["ETHUSDT", "Ethereum"], SOL: ["SOLUSDT", "Solana"], BNB: ["BNBUSDT", "BNB"],
+  XRP: ["XRPUSDT", "XRP"], DOGE: ["DOGEUSDT", "Dogecoin"], AUR: ["PAXGUSDT", "Aur"], EUR: ["EURUSDT", "Euro"],
+};
+const INTERVALS = { "1m": "1 min", "15m": "15 min", "1h": "1 oră" };
+const STAKES = [50, 100, 250, 500, 1000, 2500];
+const DURATIONS = { "5m": "5 minute", "1h": "1 oră", "24h": "24 ore" };
+
+const tg = window.Telegram && window.Telegram.WebApp;
+const q = new URLSearchParams(location.search);
+const balance = parseInt(q.get("bal") || "0", 10);
+const state = { asset: "BTC", interval: "1m", dir: null, stake: null, dur: "5m" };
+
+// --- profil ---
+if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor("#0d1121"); tg.setBackgroundColor("#0d1121"); }
+const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+if (user) {
+  document.getElementById("name").innerHTML = "<b></b>";
+  document.querySelector("#name b").textContent = user.first_name;
+  document.getElementById("avatar").textContent = (user.first_name || "?")[0].toUpperCase();
+}
+const wins = +(q.get("w") || 0), total = +(q.get("t") || 0);
+document.getElementById("bal").textContent = balance.toLocaleString("ro-RO");
+document.getElementById("level").textContent = q.get("lvl") || "🌱 Începător";
+document.getElementById("wins").textContent = wins;
+document.getElementById("rate").textContent = total ? Math.round(100 * wins / total) + "%" : "-";
+document.getElementById("streak").textContent = q.get("st") || 0;
+
+// --- butoane ---
+function chips(id, items, key, onPick, disabled) {
+  const box = document.getElementById(id);
+  box.innerHTML = "";
+  for (const [value, label] of items) {
+    const b = document.createElement("button");
+    b.className = "chip" + (state[key] === value ? " on" : "");
+    b.textContent = label;
+    b.disabled = disabled ? disabled(value) : false;
+    b.onclick = () => { state[key] = value; haptic(); onPick(); };
+    box.appendChild(b);
+  }
+}
+function haptic() { if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); }
+function renderAll() {
+  chips("assets", Object.keys(ASSETS).map(a => [a, a]), "asset", () => { renderAll(); loadChart(); });
+  chips("intervals", Object.entries(INTERVALS), "interval", () => { renderAll(); loadChart(); });
+  chips("stakes", STAKES.map(s => [s, s.toLocaleString("ro-RO")]).concat(balance > 0 ? [[balance, "Tot"]] : []),
+        "stake", renderAll, v => v > balance || v < 10);
+  chips("durations", Object.entries(DURATIONS), "dur", renderAll);
+  document.getElementById("assetName").textContent = ASSETS[state.asset][1] + " · " + state.asset;
+  document.getElementById("btnUp").classList.toggle("on", state.dir === "up");
+  document.getElementById("btnDown").classList.toggle("on", state.dir === "down");
+  updateSummary();
+}
+document.getElementById("btnUp").onclick = () => { state.dir = "up"; haptic(); renderAll(); };
+document.getElementById("btnDown").onclick = () => { state.dir = "down"; haptic(); renderAll(); };
+
+function ready() { return state.dir && state.stake && state.stake <= balance; }
+function updateSummary() {
+  const s = document.getElementById("summary");
+  if (balance < 10) { s.innerHTML = "Nu ai monede. Ia <b>bonusul zilnic</b> din meniul botului 🎁"; }
+  else if (!state.dir) { s.textContent = "Alege dacă prețul urcă sau scade"; }
+  else if (!state.stake) { s.textContent = "Alege miza"; }
+  else {
+    s.innerHTML = `${state.asset} ${state.dir === "up" ? "⬆️ urcă" : "⬇️ scade"} în ${DURATIONS[state.dur]} · miză ${state.stake.toLocaleString("ro-RO")}<br>Dacă ai dreptate primești <b>${(state.stake * 2).toLocaleString("ro-RO")}</b>`;
+  }
+  const label = "PLASEAZĂ PROGNOZA";
+  if (tg && tg.MainButton) {
+    tg.MainButton.setParams({ text: label, color: "#8b5cf6", text_color: "#ffffff" });
+    ready() ? tg.MainButton.show() : tg.MainButton.hide();
+  } else {
+    const b = document.getElementById("send");
+    b.style.display = ready() ? "block" : "none";
+  }
+}
+function submit() {
+  if (!ready()) return;
+  const data = JSON.stringify({ a: state.asset, d: state.dir, s: state.stake, t: state.dur });
+  if (tg && tg.sendData && tg.initData) { tg.sendData(data); }
+  else { alert("Deschide aplicația din botul de Telegram ca să plasezi prognoza.\n" + data); }
+}
+if (tg && tg.MainButton) tg.MainButton.onClick(submit);
+document.getElementById("send").onclick = submit;
+
+// --- grafic si pret live ---
+const chartEl = document.getElementById("chart");
+const chart = LightweightCharts.createChart(chartEl, {
+  autoSize: true,
+  layout: { background: { color: "transparent" }, textColor: "#8c96b4", fontSize: 11 },
+  grid: { vertLines: { color: "#1b2140" }, horzLines: { color: "#1b2140" } },
+  rightPriceScale: { borderColor: "#262d4f" },
+  timeScale: { borderColor: "#262d4f", timeVisible: true, secondsVisible: false },
+  crosshair: { mode: 0 },
+  handleScroll: true, handleScale: true,
+});
+const series = chart.addCandlestickSeries({
+  upColor: "#22c55e", downColor: "#f43f5e", borderVisible: false, wickUpColor: "#22c55e", wickDownColor: "#f43f5e",
+});
+
+function fmt(v) { return v < 10 ? v.toFixed(4) : v.toLocaleString("en-US", { maximumFractionDigits: v < 1000 ? 2 : 1, minimumFractionDigits: v < 1000 ? 2 : 1 }); }
+const tz = -new Date().getTimezoneOffset() * 60;  // ora locala pe axa
+let ws = null, loadId = 0;
+
+async function loadChart() {
+  const id = ++loadId;
+  const sym = ASSETS[state.asset][0];
+  const prec = state.asset === "EUR" || state.asset === "DOGE" || state.asset === "XRP" ? 4 : 2;
+  series.applyOptions({ priceFormat: { type: "price", precision: prec, minMove: 1 / 10 ** prec } });
+  try {
+    const [kl, t24] = await Promise.all([
+      fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${state.interval}&limit=120`).then(r => r.json()),
+      fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`).then(r => r.json()),
+    ]);
+    if (id !== loadId) return;
+    series.setData(kl.map(k => ({ time: k[0] / 1000 + tz, open: +k[1], high: +k[2], low: +k[3], close: +k[4] })));
+    chart.timeScale().fitContent();
+    setPrice(+t24.lastPrice, +t24.priceChangePercent);
+  } catch (e) {
+    document.getElementById("price").textContent = "Fără conexiune";
+  }
+  if (ws) ws.close();
+  ws = new WebSocket(`wss://stream.binance.com:9443/ws/${sym.toLowerCase()}@kline_${state.interval}`);
+  ws.onmessage = ev => {
+    if (id !== loadId) return;
+    const k = JSON.parse(ev.data).k;
+    series.update({ time: k.t / 1000 + tz, open: +k.o, high: +k.h, low: +k.l, close: +k.c });
+    setPrice(+k.c, null);
+  };
+}
+let lastChange = 0;
+function setPrice(p, change) {
+  if (change !== null) lastChange = change;
+  const el = document.getElementById("price");
+  el.textContent = fmt(p);
+  const ch = document.getElementById("change");
+  ch.textContent = (lastChange >= 0 ? "+" : "") + lastChange.toFixed(2) + "%";
+  ch.className = lastChange >= 0 ? "up" : "down";
+}
+
+renderAll();
+loadChart();
+</script>
+</body>
+</html>
